@@ -1,4 +1,5 @@
-import numpy as np
+import cupy as cp
+import numpy as np  # numpy는 해상도 설정 등 일부 CPU 연산에 사용될 수 있습니다.
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.widgets import RectangleSelector
@@ -11,7 +12,7 @@ class TetrationFractalExplorer:
     def __init__(self):
         # tkinter 윈도우 초기 설정
         self.root = tk.Tk()
-        self.root.title("Tetration Fractal Explorer")
+        self.root.title("Tetration Fractal Cuda Explorer")
 
         # 객체 설정, 초기회에서 빼고 함수파트에만 넣으려고 했는데, 에러나서 다시 추가.
         self.fig, self.ax = plt.subplots()   # figsize를 설정하지 않음
@@ -111,13 +112,13 @@ class TetrationFractalExplorer:
         ttk.Button(self.settings_frame, text="Save", command=self.save_image).pack(side=tk.LEFT, padx=10)
 
     def tetration(self, z, max_iter):
-        """Computes the tetration fractal."""
-        result = np.zeros(z.shape, dtype=np.complex128) +1 # 초기값을 0이 아닌 1로 세팅할 때 +1
+        """Computes the tetration fractal using GPU acceleration."""
+        result = cp.zeros(z.shape, dtype=cp.complex128) + 1 # 초기값을 1로 세팅할 때 +1
         for _ in range(max_iter):
             try:
-                result = np.exp(result * np.log(z)) # np.clip 제거
+                result = cp.exp(result * cp.log(z))
             except OverflowError:
-                result = np.inf
+                result = cp.inf
         return result
 
     def generate_fractal(self):
@@ -179,9 +180,9 @@ class TetrationFractalExplorer:
         y_range = x_range / self.aspect_ratio
         
         # 중심점&eps로 플롯할 사각형 범위(range)를 얻음
-        x = np.linspace(self.center_x - x_range / 2, self.center_x + x_range / 2, self.plot_width)
-        y = np.linspace(self.center_y - y_range / 2, self.center_y + y_range / 2, self.plot_height)
-        X, Y = np.meshgrid(x, y)
+        x = cp.linspace(self.center_x - x_range / 2, self.center_x + x_range / 2, self.plot_width)
+        y = cp.linspace(self.center_y - y_range / 2, self.center_y + y_range / 2, self.plot_height)
+        X, Y = cp.meshgrid(x, y)
         Z = X + 1j * Y
 
         return Z, x_range, y_range # 함수 분리로 반환 필요. 
@@ -190,8 +191,8 @@ class TetrationFractalExplorer:
         if self.eps > 0:
             self.ax.clear()
             extent = self.center_x - x_range / 2, self.center_x + x_range / 2, self.center_y - y_range / 2, self.center_y + y_range / 2
-            fractal_cpu = np.angle(self.fractal)
-            self.ax.imshow(fractal_cpu, extent=extent, cmap='hsv', origin='lower')
+            fractal_gpu = cp.asnumpy(cp.angle(self.fractal))
+            self.ax.imshow(fractal_gpu, extent=extent, cmap='hsv', origin='lower')
             self.ax.set_xlabel("Re")
             self.ax.set_ylabel("Im")
             self.ax.set_title(f'Tetration Fractal: Iterations={max_iter}\n'
@@ -199,7 +200,6 @@ class TetrationFractalExplorer:
             self.ax.set_autoscale_on(False)
 
             self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
-            # self.canvas.draw()
             self.fig.colorbar(self.ax.get_images()[0], ax=self.ax)
             self.canvas.draw()
         
@@ -264,7 +264,10 @@ class TetrationFractalExplorer:
         self.update_status("Reset to initial state")
 
     def save_image(self):
-        """Saves the fractal image at the selected resolution."""
+        """Saves the fractal image at the selected resolution.
+        이미 그려진 화면 plot 이용하는게 경제적이지만, 
+        화면 해상도가 아닌 선택한 resolution 에 맞는 이미지로 저장하기 위해 새로 플롯을 그림. 
+        """
         folder_name = datetime.now().strftime('%Y-%m-%d')
         script_dir = os.path.dirname(os.path.abspath(__file__))
         full_folder_path = os.path.join(script_dir, folder_name)
@@ -282,7 +285,9 @@ class TetrationFractalExplorer:
             x_range = 2 * self.eps
             y_range = 2 * self.eps / self.aspect_ratio
             extent = self.center_x - x_range / 2, self.center_x + x_range / 2, self.center_y - y_range / 2, self.center_y + y_range / 2
-            ax.imshow(np.angle(self.fractal), extent=extent, cmap='hsv', origin='lower') 
+            fractal_gpu = cp.asnumpy(cp.angle(self.fractal))
+            ax.imshow(fractal_gpu, extent=extent, cmap='hsv', origin='lower')
+
             ax.set_xlabel("Re")
             ax.set_ylabel("Im")
             ax.set_title(f'Tetration Fractal: Iterations={int(self.max_iter_var.get())}\n'
