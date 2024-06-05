@@ -24,6 +24,20 @@ class TetrationFractalExplorer:
         file_menu = tk.Menu(self.menu_bar, tearoff=0)
         file_menu.add_command(label="Exit", command=self.on_exit)
         self.menu_bar.add_cascade(label="File", menu=file_menu)
+
+        # 테트레이션 함수 선택 메뉴 추가
+        self.tetration_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.tetration_functions = {
+            "Original Tetration(COLOR)": self.original_tetration_color,
+            "ln & Exp combi": self.ln_exp_combi
+        }
+        self.selected_tetration_function = tk.StringVar(value="Original Tetration(COLOR)")
+        for name in self.tetration_functions:
+            self.tetration_menu.add_radiobutton(label=name, variable=self.selected_tetration_function, command=self.update_fractal)
+        self.menu_bar.add_cascade(label="Tetration Function", menu=self.tetration_menu)
+
+        self.tetration_function = self.original_tetration_color
+
         self.root.config(menu=self.menu_bar)
 
         # 상태 바 설정
@@ -111,8 +125,10 @@ class TetrationFractalExplorer:
         # 이미지 저장 버튼 설정
         ttk.Button(self.settings_frame, text="Save", command=self.save_image).pack(side=tk.LEFT, padx=10)
 
-    def tetration(self, z, max_iter):
-        """Computes the tetration fractal using GPU acceleration."""
+    def ln_exp_combi(self, z, max_iter):
+        """
+        result = 반복:(e^(result*ln(z))
+        """
         result = cp.zeros(z.shape, dtype=cp.complex128) + 1 # 초기값을 1로 세팅할 때 +1
         for _ in range(max_iter):
             try:
@@ -121,24 +137,39 @@ class TetrationFractalExplorer:
                 result = cp.inf
         return result
 
-    def generate_fractal(self):
-        """Generates and displays the fractal. 플롯 이미지 생성"""
+    def original_tetration_color(self, z, max_iter):
+        """Computes the fractal using simple exponential iteration."""
+        result = z
+        for _ in range(max_iter):
+            result = z ** result
+        return result
 
+    def generate_fractal(self):
+        """
+        Generates and displays the fractal. 
+        플롯 이미지 생성
+        """
+        # print(f"Starting generate_fractal(self)")
         self.update_status("Generating fractal...")
 
         self.regenerate_canvas()
         max_iter = int(self.max_iter_var.get())
         Z, x_range, y_range = self.calculate_plot_range(max_iter)
 
-        self.fractal = self.tetration(Z, max_iter)  # self.fractal에 저장
+        # 현재 선택된 테트레이션 함수 사용
+        tetration_function = self.tetration_functions[self.selected_tetration_function.get()]
+        self.fractal = tetration_function(Z, max_iter)
 
         self.plot_fractal(max_iter, x_range, y_range) # plot_fractal_alter 를 사용해 볼 수도 있으나... 별로인듯?
 
     def regenerate_canvas(self):
-        # self.fig, self.ax, self.canvas 객체 삭제
-        # 원래는 불필요한 과정이 맞으나, 
-        # 이상하게 컬러바가 삭제되지 않고 추가생성되며 플롯 영역이 줄어드는 문제가 있어서 
-        # 캔버스를 삭제하고 새로 그리기로 함. 
+        """
+        self.fig, self.ax, self.canvas 객체 삭제 후 재생성
+        원래는 불필요한 과정이 맞으나, 
+        이상하게 컬러바가 삭제되지 않고 추가 생성되며 플롯 영역이 줄어드는 문제가 있어서 
+        캔버스를 삭제하고 새로 그리기로 함. 
+        스트레스 받아서 일단 이대로 쓸 것임. 
+        """
 
         if self.canvas is not None:
             self.canvas.get_tk_widget().destroy()
@@ -162,10 +193,10 @@ class TetrationFractalExplorer:
     def calculate_plot_range(self, max_iter):
         # 이미지 플롯할 해상도와 비율 얻기
         resolution_options = {
-        "4K": (3840, 2160),
-        "1080p": (1920, 1080),
-        "720p": (1280, 720),
-        "1080(1:1)": (1080, 1080),
+            "4K": (3840, 2160),
+            "1080p": (1920, 1080),
+            "720p": (1280, 720),
+            "1080(1:1)": (1080, 1080),
         }
         selected_resolution = self.ratio_var.get()
         if selected_resolution in resolution_options:
@@ -175,22 +206,28 @@ class TetrationFractalExplorer:
 
         self.aspect_ratio = self.plot_width / self.plot_height
 
-        # x와 y의 범위 설정
-        x_range = 2 * self.eps
-        y_range = x_range / self.aspect_ratio
-        
-        # 중심점&eps로 플롯할 사각형 범위(range)를 얻음
-        x = cp.linspace(self.center_x - x_range / 2, self.center_x + x_range / 2, self.plot_width)
-        y = cp.linspace(self.center_y - y_range / 2, self.center_y + y_range / 2, self.plot_height)
-        X, Y = cp.meshgrid(x, y)
+        # 플롯용 x와 y의 값 설정
+        x = self.center_x
+        y = self.center_y
+        eps = self.eps
+        eps_y = self.eps / self.aspect_ratio
+        xlim = (x - eps, x + eps)
+        ylim = (y - eps_y, y + eps_y)
+
+        # 중심점&eps로 플롯할 사각형 범위(range)를 얻음. cp np 고민
+        x_range = np.linspace(xlim[0], xlim[1], self.plot_width)
+        y_range = np.linspace(ylim[0], ylim[1], self.plot_height)
+
+        X, Y = np.meshgrid(x_range, y_range)
         Z = X + 1j * Y
+        Z = cp.array(Z)  # GPU 연산을 위해 CuPy 배열로 변환
 
         return Z, x_range, y_range # 함수 분리로 반환 필요. 
 
     def plot_fractal(self, max_iter, x_range, y_range):
         if self.eps > 0:
             self.ax.clear()
-            extent = self.center_x - x_range / 2, self.center_x + x_range / 2, self.center_y - y_range / 2, self.center_y + y_range / 2
+            extent = [x_range.min(), x_range.max(), y_range.min(), y_range.max()]
             fractal_gpu = cp.asnumpy(cp.abs(cp.angle(self.fractal)))
             self.ax.imshow(fractal_gpu, extent=extent, cmap='hsv', origin='lower')
             self.ax.set_xlabel("Re")
@@ -212,8 +249,8 @@ class TetrationFractalExplorer:
         color_magnitude = np.log(magnitude + 1e-9)
 
         self.ax.clear()
-        img = self.ax.imshow(color_magnitude, cmap='hsv', extent=[self.center_x - x_range / 2, self.center_x + x_range / 2,
-                                                                  self.center_y - y_range / 2, self.center_y + y_range / 2])
+        extent = [x_range.min(), x_range.max(), y_range.min(), y_range.max()]       
+        img = self.ax.imshow(color_magnitude, cmap='hsv', extent=extent)
 
         self.fig.colorbar(img, ax=self.ax, fraction=0.046, pad=0.04)
         self.ax.set_title(f"Tetration Fractal\nMax Iterations: {max_iter}, Center: ({self.center_x:.5f}, {self.center_y:.5f}), Eps: {self.eps:.5f}")
@@ -227,9 +264,17 @@ class TetrationFractalExplorer:
 
     def update_fractal(self, *args):
         """Updates the fractal based on maximum iterations.
-        max_iter 리스트에서 선택 후에만 호출됨 """
+        max_iter 리스트에서 선택시, 
+        메뉴에서 함수 선택시
+        호출됨
+        """
+        # print(f'args: {args}')
+        function_name = self.selected_tetration_function.get()
+        self.tetration_function = self.tetration_functions[function_name]
+
         try:
-            self.max_iter_var.set(args[0])  # 리스트에서 설정된 값 1개만 있음. 그래서 [0]
+            if args:
+                self.max_iter_var.set(args[0])  # max_iter에서 호출할 때만
             self.generate_fractal()
             self.update_status(f'Updated max iterations to {self.max_iter_var.get()}')
         except ValueError:
@@ -283,9 +328,23 @@ class TetrationFractalExplorer:
             self.update_status(f"File already exists: {file_path}")
         else:
             fig, ax = plt.subplots(figsize=(self.plot_width / 100, self.plot_height / 100))
-            x_range = 2 * self.eps
-            y_range = 2 * self.eps / self.aspect_ratio
-            extent = self.center_x - x_range / 2, self.center_x + x_range / 2, self.center_y - y_range / 2, self.center_y + y_range / 2
+
+            # 플롯용 x와 y의 값 설정
+            x = self.center_x
+            y = self.center_y
+            eps = self.eps
+            eps_y = self.eps / self.aspect_ratio
+            xlim = (x - eps, x + eps)
+            ylim = (y - eps_y, y + eps_y)
+            
+            # self.fig.set_size_inches(self.plot_width / 100, self.plot_height / 100)  # 100 DPI로 가정
+            # 이게 있어야 맞는 건지 없어야 맞는 건지?
+
+            x_range = np.linspace(xlim[0], xlim[1], self.plot_width)
+            y_range = np.linspace(ylim[0], ylim[1], self.plot_height)
+
+            extent = [x_range.min(), x_range.max(), y_range.min(), y_range.max()]
+
             fractal_gpu = cp.asnumpy(cp.angle(self.fractal))
             ax.imshow(fractal_gpu, extent=extent, cmap='hsv', origin='lower')
 
