@@ -191,7 +191,7 @@ class TetrationFractalExplorer:
         if self.eps > 0:
             self.ax.clear()
             extent = self.center_x - x_range / 2, self.center_x + x_range / 2, self.center_y - y_range / 2, self.center_y + y_range / 2
-            fractal_gpu = abs(cp.asnumpy(cp.angle(self.fractal)))
+            fractal_gpu = cp.asnumpy(cp.abs(cp.angle(self.fractal)))
             self.ax.imshow(fractal_gpu, extent=extent, cmap='hsv', origin='lower')
             self.ax.set_xlabel("Re")
             self.ax.set_ylabel("Im")
