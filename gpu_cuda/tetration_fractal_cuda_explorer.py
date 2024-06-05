@@ -38,7 +38,7 @@ class TetrationFractalExplorer:
 
         # 최대 반복 횟수 설정
         self.max_iter_var = tk.StringVar()
-        self.max_iter_var.set("20")  # 초기값 설정
+        self.max_iter_var.set("100")  # 초기값 설정
 
         # 플롯 화면 비율 설정
         self.ratio_options = ["4K", "1080p", "720p", "1080(1:1)"]
@@ -71,8 +71,8 @@ class TetrationFractalExplorer:
 
         # 최대 반복 횟수 옵션 설정
         self.max_iter_options = [20, 50, 100, 200, 500]
-        self.max_iter_var = tk.StringVar(value=str(self.max_iter_options[0]))
-        self.max_iter_dropdown = ttk.OptionMenu(self.settings_frame, self.max_iter_var, str(self.max_iter_options[0]), *map(str, self.max_iter_options), command=self.update_fractal)
+        self.max_iter_var = tk.StringVar(value=str(self.max_iter_options[2]))
+        self.max_iter_dropdown = ttk.OptionMenu(self.settings_frame, self.max_iter_var, str(self.max_iter_options[2]), *map(str, self.max_iter_options), command=self.update_fractal)
         self.max_iter_dropdown.pack(side=tk.LEFT, padx=10)
 
         # 플롯 화면 비율 옵션 설정
@@ -226,9 +226,10 @@ class TetrationFractalExplorer:
 
 
     def update_fractal(self, *args):
-        """Updates the fractal based on maximum iterations."""
+        """Updates the fractal based on maximum iterations.
+        max_iter 리스트에서 선택 후에만 호출됨 """
         try:
-            self.max_iter_var.set(args[0])
+            self.max_iter_var.set(args[0])  # 리스트에서 설정된 값 1개만 있음. 그래서 [0]
             self.generate_fractal()
             self.update_status(f'Updated max iterations to {self.max_iter_var.get()}')
         except ValueError:
@@ -259,7 +260,7 @@ class TetrationFractalExplorer:
         """Resets the fractal to the initial state."""
         self.center_x, self.center_y = -0.5, 0
         self.eps = 1
-        self.max_iter_var.set("20")
+        self.max_iter_var.set("100")
         self.generate_fractal()
         self.update_status("Reset to initial state")
 
