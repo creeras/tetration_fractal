@@ -77,7 +77,7 @@ class TetrationFractalExplorer:
 
         # 플롯 화면 비율 옵션 설정
         ttk.Label(self.settings_frame, text="Resolution:").pack(side=tk.LEFT, padx=10)
-        self.ratio_dropdown = ttk.OptionMenu(self.settings_frame, self.ratio_var, self.ratio_options[1], *self.ratio_options, command=self.update_ratio)
+        self.ratio_dropdown = ttk.OptionMenu(self.settings_frame, self.ratio_var, self.ratio_options[2], *self.ratio_options, command=self.update_ratio)
         self.ratio_dropdown.pack(side=tk.LEFT, padx=10)
 
         # 좌표 및 eps 값 입력 설정
@@ -171,7 +171,7 @@ class TetrationFractalExplorer:
         if selected_resolution in resolution_options:
             self.plot_width, self.plot_height = resolution_options[selected_resolution]
         else:
-            self.plot_width, self.plot_height = 1920, 1080  # 기본값 설정
+            self.plot_width, self.plot_height = 1280, 720  # 기본값 설정
 
         self.aspect_ratio = self.plot_width / self.plot_height
 
