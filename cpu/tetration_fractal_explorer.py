@@ -190,7 +190,7 @@ class TetrationFractalExplorer:
         if self.eps > 0:
             self.ax.clear()
             extent = self.center_x - x_range / 2, self.center_x + x_range / 2, self.center_y - y_range / 2, self.center_y + y_range / 2
-            fractal_cpu = np.angle(self.fractal)
+            fractal_cpu = np.abs(np.angle(self.fractal))
             self.ax.imshow(fractal_cpu, extent=extent, cmap='hsv', origin='lower')
             self.ax.set_xlabel("Re")
             self.ax.set_ylabel("Im")
