@@ -130,7 +130,7 @@ class TetrationFractalExplorer:
         """Computes the fractal using simple exponential iteration."""
         result = cp.copy(z)
         for _ in range(max_iter):
-            result = z ** result
+            result = cp.power(z, result)  # cp.power 함수를 이용하여 계산
         return result
     
     def ln_exp_combi(self, z, max_iter):
