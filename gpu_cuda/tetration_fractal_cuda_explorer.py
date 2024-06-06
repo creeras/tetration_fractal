@@ -29,6 +29,7 @@ class TetrationFractalExplorer:
         self.tetration_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.tetration_functions = {
             "Normal Tetration": self.normal_tetration,
+            "Divergent Tetration": self.divergent_tetration,
             "ln & Exp combi": self.ln_exp_combi
         }
         self.selected_tetration_function = tk.StringVar(value="Normal Tetration")
@@ -36,7 +37,7 @@ class TetrationFractalExplorer:
             self.tetration_menu.add_radiobutton(label=name, variable=self.selected_tetration_function, command=self.update_fractal)
         self.menu_bar.add_cascade(label="Tetration Function", menu=self.tetration_menu)
 
-        self.tetration_function = self.normal_tetration
+        self.tetration_function = self.normal_tetration # init tetration function
 
         # 페이즈(magnitude, angle) 선택 메뉴 추가
         self.phase_menu = tk.Menu(self.menu_bar, tearoff=0)
@@ -51,7 +52,7 @@ class TetrationFractalExplorer:
 
         # cmap 리스트 선택 메뉴 추가
         self.cmap_menu = tk.Menu(self.menu_bar, tearoff=0)
-        self.cmap_options = ["hsv", "viridis", "plasma", "inferno", "magma", "cividis"]
+        self.cmap_options = ["hsv", "viridis", "plasma", "inferno", "magma", "gray"]
         self.selected_cmap_value = tk.StringVar(value="hsv")
         for cmap in self.cmap_options:
             self.cmap_menu.add_radiobutton(label=cmap, variable=self.selected_cmap_value, command=self.update_fractal)
@@ -155,6 +156,23 @@ class TetrationFractalExplorer:
                 result = cp.inf
         return result
     
+    def divergent_tetration(self, z, max_iter):
+        """Computes the fractal using simple exponential iteration."""
+        escape_radius = 1e+10 
+
+        result = cp.copy(z)
+        divergence_map = cp.zeros(z.shape, dtype=cp.bool_)
+
+        for _ in range(max_iter):
+            try:
+                cp.power(z, result, out=result)  # 메모리 재할당 없이 직접 수정.
+                mask= cp.abs(result) > escape_radius
+                divergence_map[mask] = True
+                z[mask] = cp.nan # 발산한 지점은 더 이상 계산하지 않음.
+            except OverflowError:
+                result = cp.inf
+        return divergence_map
+
     def ln_exp_combi(self, z, max_iter):
         """
         result = 반복:(e^(result*ln(z))
