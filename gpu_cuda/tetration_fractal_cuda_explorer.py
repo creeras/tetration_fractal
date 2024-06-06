@@ -14,7 +14,7 @@ class TetrationFractalExplorer:
         self.root = tk.Tk()
         self.root.title("Tetration Fractal Cuda Explorer")
 
-        # 객체 설정, 초기회에서 빼고 함수파트에만 넣으려고 했는데, 에러나서 다시 추가.
+        # 객체 설정, 초기화에서 빼고 함수파트에만 넣으려고 했는데, 에러나서 다시 추가.
         self.fig, self.ax = plt.subplots()   # figsize를 설정하지 않음
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.root)
         self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
@@ -28,16 +28,36 @@ class TetrationFractalExplorer:
         # 테트레이션 함수 선택 메뉴 추가
         self.tetration_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.tetration_functions = {
-            "Original Tetration(COLOR)": self.original_tetration_color,
+            "Normal Tetration": self.normal_tetration,
             "ln & Exp combi": self.ln_exp_combi
         }
-        self.selected_tetration_function = tk.StringVar(value="Original Tetration(COLOR)")
+        self.selected_tetration_function = tk.StringVar(value="Normal Tetration")
         for name in self.tetration_functions:
             self.tetration_menu.add_radiobutton(label=name, variable=self.selected_tetration_function, command=self.update_fractal)
         self.menu_bar.add_cascade(label="Tetration Function", menu=self.tetration_menu)
 
-        self.tetration_function = self.original_tetration_color
+        self.tetration_function = self.normal_tetration
 
+        # 페이즈(magnitude, angle) 선택 메뉴 추가
+        self.phase_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.phase_options = {
+            "Magnitude(R)": self.fractal_magnitude,
+            "Angle(θ)": self.fractal_angle
+        }
+        self.selected_phase_value = tk.StringVar(value="Magnitude(R)")
+        for name in self.phase_options:
+            self.phase_menu.add_radiobutton(label=name, variable=self.selected_phase_value, command=self.update_fractal)
+        self.menu_bar.add_cascade(label="Phase", menu=self.phase_menu)
+
+        # cmap 리스트 선택 메뉴 추가
+        self.cmap_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.cmap_options = ["hsv", "viridis", "plasma", "inferno", "magma", "cividis"]
+        self.selected_cmap_value = tk.StringVar(value="hsv")
+        for cmap in self.cmap_options:
+            self.cmap_menu.add_radiobutton(label=cmap, variable=self.selected_cmap_value, command=self.update_fractal)
+        self.menu_bar.add_cascade(label="Colormap", menu=self.cmap_menu)
+
+        # 이건 따로인 듯
         self.root.config(menu=self.menu_bar)
 
         # 상태 바 설정
@@ -125,14 +145,14 @@ class TetrationFractalExplorer:
         # 이미지 저장 버튼 설정
         ttk.Button(self.settings_frame, text="Save", command=self.save_image).pack(side=tk.LEFT, padx=10)
 
-
-    def original_tetration_color(self, z, max_iter):
+    def normal_tetration(self, z, max_iter):
         """Computes the fractal using simple exponential iteration."""
         result = cp.copy(z)
         for _ in range(max_iter):
-            # result = cp.power(z, result)  # cp.power 함수를 이용하여 계산
-            cp.power(z, result, out=result)  # 메모리 재할당 없이 직접 수정.
-
+            try:
+                cp.power(z, result, out=result)  # 메모리 재할당 없이 직접 수정.
+            except OverflowError:
+                result = cp.inf
         return result
     
     def ln_exp_combi(self, z, max_iter):
@@ -159,12 +179,18 @@ class TetrationFractalExplorer:
         max_iter = int(self.max_iter_var.get())
         Z, x_range, y_range = self.calculate_plot_range(max_iter)
 
-        # 현재 선택된 테트레이션 함수 사용
+        # 현재 선택된 테트레이션 함수 및 페이즈(r,θ) 선택 적용
         tetration_function = self.tetration_functions[self.selected_tetration_function.get()]
         self.fractal = tetration_function(Z, max_iter)
+        phase_func = self.phase_options[self.selected_phase_value.get()]
 
-        self.plot_fractal(max_iter, x_range, y_range) # plot_fractal_alter 를 사용해 볼 수도 있으나... 별로인듯?
+        self.plot_fractal(max_iter, x_range, y_range, phase_func) # plot_fractal_alter 를 사용해 볼 수도 있으나... 별로인듯?
 
+    def fractal_magnitude(self, fractal):
+        return cp.log(cp.abs(fractal))
+    def fractal_angle(self, fractal):
+        return cp.angle(fractal)
+    
     def regenerate_canvas(self):
         """
         self.fig, self.ax, self.canvas 객체 삭제 후 재생성
@@ -227,12 +253,13 @@ class TetrationFractalExplorer:
 
         return Z, x_range, y_range # 함수 분리로 반환 필요. 
 
-    def plot_fractal(self, max_iter, x_range, y_range):
+    def plot_fractal(self, max_iter, x_range, y_range, phase_func):
         if self.eps > 0:
             self.ax.clear()
             extent = [x_range.min(), x_range.max(), y_range.min(), y_range.max()]
-            fractal_gpu = cp.asnumpy(cp.abs(cp.angle(self.fractal)))
-            self.ax.imshow(fractal_gpu, extent=extent, cmap='hsv', origin='lower')
+            fractal = cp.asnumpy(phase_func(self.fractal))
+            cmap = self.selected_cmap_value.get()  # 선택된 컬러맵
+            self.ax.imshow(fractal, extent=extent, cmap=cmap, origin='lower')
             self.ax.set_xlabel("Re")
             self.ax.set_ylabel("Im")
             self.ax.set_title(f'Tetration Fractal: Iterations={max_iter}\n'
@@ -274,6 +301,10 @@ class TetrationFractalExplorer:
         # print(f'args: {args}')
         function_name = self.selected_tetration_function.get()
         self.tetration_function = self.tetration_functions[function_name]
+
+        # print(f'args: {args}')
+        phase_name = self.selected_phase_value.get()
+        self.phase_menu = self.phase_options[phase_name]
 
         try:
             if args:
@@ -348,8 +379,10 @@ class TetrationFractalExplorer:
 
             extent = [x_range.min(), x_range.max(), y_range.min(), y_range.max()]
 
-            fractal_gpu = cp.asnumpy(cp.angle(self.fractal))
-            ax.imshow(fractal_gpu, extent=extent, cmap='hsv', origin='lower')
+            phase_func = self.phase_options[self.selected_phase_value.get()]
+            fractal = cp.asnumpy(phase_func(self.fractal))
+            cmap = self.selected_cmap_value.get()  # 선택된 컬러맵
+            ax.imshow(fractal, extent=extent, cmap=cmap, origin='lower')
 
             ax.set_xlabel("Re")
             ax.set_ylabel("Im")
