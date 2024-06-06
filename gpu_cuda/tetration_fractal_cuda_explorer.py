@@ -125,6 +125,14 @@ class TetrationFractalExplorer:
         # 이미지 저장 버튼 설정
         ttk.Button(self.settings_frame, text="Save", command=self.save_image).pack(side=tk.LEFT, padx=10)
 
+
+    def original_tetration_color(self, z, max_iter):
+        """Computes the fractal using simple exponential iteration."""
+        result = cp.copy(z)
+        for _ in range(max_iter):
+            result = z ** result
+        return result
+    
     def ln_exp_combi(self, z, max_iter):
         """
         result = 반복:(e^(result*ln(z))
@@ -136,14 +144,7 @@ class TetrationFractalExplorer:
             except OverflowError:
                 result = cp.inf
         return result
-
-    def original_tetration_color(self, z, max_iter):
-        """Computes the fractal using simple exponential iteration."""
-        result = z
-        for _ in range(max_iter):
-            result = z ** result
-        return result
-
+    
     def generate_fractal(self):
         """
         Generates and displays the fractal. 
