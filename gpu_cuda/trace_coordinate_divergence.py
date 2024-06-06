@@ -25,30 +25,43 @@ def generate_frame(x_center, y_center, x_eps, image_width, image_height, max_ite
     X, Y = cp.meshgrid(x, y)
     C = X + 1j * Y
 
-    if x_eps < 1e-6:
+    # 좌표 간격이 큰 경우 데이터 타입을 축소해도 이미지 손실이 적음, 이미지 손실이 발생하면 조금씩 깍두기 커짐
+    # 1e-4 일 때 사람이라면 눈치채지 못할 정도고, 1e-5는 약간 생기는 듯 함. (resolution 과도 관계가 있으려나?) 
+    if x_eps < 1e-4:
         C = C.astype(cp.complex128)
     else:
         C = C.astype(cp.complex64)
 
     image_data = calculate_tetration(C, max_iter, threshold)
-    return image_data
+    # 수렴/발산 색을 반전시킴. 
+    inverted_image_data = 1 - image_data
+    return inverted_image_data
 
-def interpolate(start, end, num_steps):
+def interpolate(start, end, num_steps): # 리니어한 이동에 사용
     return [start + (end - start) * i / (num_steps - 1) for i in range(num_steps)]
+
+def interpolate_log(start, end, num_steps): # 로그 스케일로 줌인 속도를 균일하게 유지
+    log_start = np.log10(start)
+    log_end = np.log10(end)
+    return [10 ** (log_start + (log_end - log_start) * i / (num_steps - 1)) for i in range(num_steps)]
 
 def main():
     # 사용자 입력
     # 시작 좌표, 좌우영역
-    x1, y1 = -0.5, 0
-    eps1 = 2.0
-    # 끝 좌표, 좌우영역
-    x2, y2 = -1.2004367247330716, 0.8380135724997042
-    eps2 = 2.4079394400189358e-05
-    # 총 프레임 수 
-    num_frames = 2000
-    max_iter = 100
+    # x1, y1 = -0.5, 0
+    # eps1 = 2.0
 
-    threshold = 1e10
+    x1, y1 = -4.086058278688595, -9.740283918520907e-10
+    eps1 = 1.0
+
+    # 끝 좌표, 좌우영역
+    x2, y2 = -4.086058278688595, -9.740283918520907e-10
+    eps2 = 3.6188788410385087e-08
+    # 총 프레임 수 
+    num_frames = 15*36
+    max_iter = 500
+
+    threshold = 1e10 # abs(z) 수렴/발산 판정 기준
     image_width = 1920
     image_height = 1080
 
@@ -59,7 +72,7 @@ def main():
 
     x_centers = interpolate(x1, x2, num_frames)
     y_centers = interpolate(y1, y2, num_frames)
-    x_eps_values = interpolate(eps1, eps2, num_frames)
+    x_eps_values = interpolate_log(eps1, eps2, num_frames)
 
     if num_frames > 30*60: # 1800 프레임 이상 생성할 때 샘플 이미지 생성 
         # 샘플 프레임 생성
