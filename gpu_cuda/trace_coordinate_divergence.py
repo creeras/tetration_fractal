@@ -16,7 +16,8 @@ def calculate_tetration(c, max_iter, threshold):
             break
     return mask
 
-def generate_frame(x_center, y_center, x_eps, image_width, image_height, max_iter, threshold):
+
+def generate_frame(x_center, y_center, x_eps, image_width, image_height, max_iter, threshold, threshold_complexity):
     
     y_eps = x_eps * (image_height / image_width)
 
@@ -25,9 +26,10 @@ def generate_frame(x_center, y_center, x_eps, image_width, image_height, max_ite
     X, Y = cp.meshgrid(x, y)
     C = X + 1j * Y
 
-    # 좌표 간격이 큰 경우 데이터 타입을 축소해도 이미지 손실이 적음, 이미지 손실이 발생하면 조금씩 깍두기 커짐
-    # 1e-4 일 때 사람이라면 눈치채지 못할 정도고, 1e-5는 약간 생기는 듯 함. (resolution 과도 관계가 있으려나?) 
-    if x_eps < 1e-4:
+    # 좌표 간격이 큰 경우 데이터 타입을 축소해도 양 옆 픽셀간 구분이 가능함.
+    # 좌표 간격이 작으면 작을 수록 더 정밀한 값으로 계산해야 옆 픽셀간 구분이 가능해짐.
+    #  1080p 기준, 7e-4 부터 슬슬 조짐이 보이며 1e-4일 때는 일 때 많이 거슬리네요. 
+    if x_eps < threshold_complexity * (image_width/1920):
         C = C.astype(cp.complex128)
     else:
         C = C.astype(cp.complex64)
@@ -61,6 +63,7 @@ def main():
     num_frames = 15*36
     max_iter = 500
 
+    threshold_complexity = 7e-4 # 복소수 계산 정밀도 향상 기준, 1080p 기준
     threshold = 1e10 # abs(z) 수렴/발산 판정 기준
     image_width = 1920
     image_height = 1080
@@ -83,14 +86,14 @@ def main():
         sample_y_centers = interpolate(y1, y2, num_sample_frames)
         sample_x_eps_values = interpolate(eps1, eps2, num_sample_frames)
         for i in range(num_sample_frames):
-            sample_frame_data = generate_frame(sample_x_centers[i], sample_y_centers[i], sample_x_eps_values[i], image_width, image_height, max_iter, threshold)
+            sample_frame_data = generate_frame(sample_x_centers[i], sample_y_centers[i], sample_x_eps_values[i], image_width, image_height, max_iter, threshold, threshold_complexity)
             sample_frame_image = Image.fromarray(cp.asnumpy(sample_frame_data * 255))
             sample_frame_image.save(os.path.join(sample_dir, f"sample_frame_{i+1:03d}.png"))
 
     start_time = time.time()  # 시작 시간 기록
 
     for i in tqdm(range(num_frames), desc="Generating frames", unit="frame"):
-        frame_data = generate_frame(x_centers[i], y_centers[i], x_eps_values[i], image_width, image_height, max_iter, threshold)
+        frame_data = generate_frame(x_centers[i], y_centers[i], x_eps_values[i], image_width, image_height, max_iter, threshold, threshold_complexity)
         
         frame_image = Image.fromarray(cp.asnumpy(frame_data * 255))
 
