@@ -280,7 +280,6 @@ class TetrationFractalExplorer:
             Z = Z.astype(cp.complex64)
 
         Z = cp.array(Z)  # GPU 연산을 위해 CuPy 배열로 변환
-        print(f'Z.dtype : {Z.dtype}, Z[0] : {Z[0]}')
         return Z, x_range, y_range # 함수 분리로 반환 필요. 
 
     def plot_fractal(self, max_iter, x_range, y_range, phase_func):
