@@ -55,7 +55,7 @@ class TetrationFractalExplorer:
         self.cmap_options = ["hsv", "viridis", "plasma", "inferno", "magma", "gray"]
         self.selected_cmap_value = tk.StringVar(value="hsv")
         for cmap in self.cmap_options:
-            self.cmap_menu.add_radiobutton(label=cmap, variable=self.selected_cmap_value, command=self.update_fractal)
+            self.cmap_menu.add_radiobutton(label=cmap, variable=self.selected_cmap_value, command=self.update_colormap)
         self.menu_bar.add_cascade(label="Colormap", menu=self.cmap_menu)
 
         # 이건 따로인 듯
@@ -68,8 +68,8 @@ class TetrationFractalExplorer:
         self.update_status("Ready")
 
         # 초기 프랙탈 경계 설정
-        self.center_x, self.center_y = -0.5, 0
-        self.eps = 1
+        self.center_x, self.center_y = 4, 0
+        self.eps = 9
 
         # 최대 반복 횟수 설정
         self.max_iter_var = tk.StringVar()
@@ -194,15 +194,15 @@ class TetrationFractalExplorer:
         self.update_status("Generating fractal...")
 
         self.regenerate_canvas()
-        max_iter = int(self.max_iter_var.get())
-        Z, x_range, y_range = self.calculate_plot_range(max_iter)
+        self.max_iter = int(self.max_iter_var.get())
+        Z, self.x_range, self.y_range = self.calculate_plot_range(self.max_iter)
 
         # 현재 선택된 테트레이션 함수 및 페이즈(r,θ) 선택 적용
-        tetration_function = self.tetration_functions[self.selected_tetration_function.get()]
-        self.fractal = tetration_function(Z, max_iter)
-        phase_func = self.phase_options[self.selected_phase_value.get()]
+        self.tetration_function = self.tetration_functions[self.selected_tetration_function.get()]
+        self.fractal = self.tetration_function(Z, self.max_iter)
+        self.phase_func = self.phase_options[self.selected_phase_value.get()]
 
-        self.plot_fractal(max_iter, x_range, y_range, phase_func) # plot_fractal_alter 를 사용해 볼 수도 있으나... 별로인듯?
+        self.plot_fractal(self.max_iter, self.x_range, self.y_range, self.phase_func) # plot_fractal_alter 를 사용해 볼 수도 있으나... 별로인듯?
 
     def fractal_magnitude(self, fractal):
         return cp.log(cp.abs(fractal))
@@ -254,6 +254,7 @@ class TetrationFractalExplorer:
         self.aspect_ratio = self.plot_width / self.plot_height
 
         # 플롯용 x와 y의 값 설정
+        # x = np.float64(self.center_x)
         x = self.center_x
         y = self.center_y
         eps = self.eps
@@ -267,8 +268,19 @@ class TetrationFractalExplorer:
 
         X, Y = np.meshgrid(x_range, y_range)
         Z = X + 1j * Y
-        Z = cp.array(Z)  # GPU 연산을 위해 CuPy 배열로 변환
 
+        # 좌표 간격이 큰 경우 데이터 타입을 축소해도 양 옆 픽셀간 구분이 가능함.
+        # 좌표 간격이 작으면 작을 수록 더 정밀한 값으로 계산해야 옆 픽셀간 구분이 가능해짐.
+        #  1080p 기준, 7e-4 부터 슬슬 조짐이 보이며 1e-4일 때는 일 때 많이 거슬리네요. 
+        threshold_complexity = 7e-3
+
+        if eps < threshold_complexity * (self.plot_width/1920):
+            Z = Z.astype(cp.complex128)
+        else:
+            Z = Z.astype(cp.complex64)
+
+        Z = cp.array(Z)  # GPU 연산을 위해 CuPy 배열로 변환
+        print(f'Z.dtype : {Z.dtype}, Z[0] : {Z[0]}')
         return Z, x_range, y_range # 함수 분리로 반환 필요. 
 
     def plot_fractal(self, max_iter, x_range, y_range, phase_func):
@@ -307,7 +319,13 @@ class TetrationFractalExplorer:
 
         self.update_status("Fractal generated.")
 
+    def update_colormap(self, *args):
+        """
+        colormap 변경시 호출됨
+        """
+        self.regenerate_canvas() # 원래는 이것도 필요없어야 맞는건데, 칼라바 무한증식 현상이 나타나서 어쩔 수 없음.
 
+        self.plot_fractal(self.max_iter, self.x_range, self.y_range, self.phase_func) 
 
 
     def update_fractal(self, *args):
