@@ -117,17 +117,17 @@ class TetrationFractalExplorer:
 
         # 좌표 및 eps 값 입력 설정
         ttk.Label(self.settings_frame, text="x=").pack(side=tk.LEFT, padx=5)
-        self.x_entry = ttk.Entry(self.settings_frame, width=17)
+        self.x_entry = ttk.Entry(self.settings_frame, width=20)
         self.x_entry.pack(side=tk.LEFT, padx=5)
         self.x_entry.insert(0, f"{self.center_x:.14f}")
 
         ttk.Label(self.settings_frame, text="y=").pack(side=tk.LEFT, padx=5)
-        self.y_entry = ttk.Entry(self.settings_frame, width=17)
+        self.y_entry = ttk.Entry(self.settings_frame, width=20)
         self.y_entry.pack(side=tk.LEFT, padx=5)
         self.y_entry.insert(0, f"{self.center_y:.14f}")
 
         ttk.Label(self.settings_frame, text="eps=").pack(side=tk.LEFT, padx=5)
-        self.eps_entry = ttk.Entry(self.settings_frame, width=17)
+        self.eps_entry = ttk.Entry(self.settings_frame, width=20)
         self.eps_entry.pack(side=tk.LEFT, padx=5)
         self.eps_entry.insert(0, f"{self.eps:.14f}")
 
@@ -158,19 +158,19 @@ class TetrationFractalExplorer:
     
     def divergent_tetration(self, z, max_iter):
         """Computes the fractal using simple exponential iteration."""
+        print(f'Function : Divergent_tetration begins / New Version')
         escape_radius = 1e+10 
 
         result = cp.copy(z)
         divergence_map = cp.zeros(z.shape, dtype=cp.bool_)
 
         for _ in range(max_iter):
-            try:
-                cp.power(z, result, out=result)  # 메모리 재할당 없이 직접 수정.
-                mask= cp.abs(result) > escape_radius
-                divergence_map[mask] = True
-                z[mask] = cp.nan # 발산한 지점은 더 이상 계산하지 않음.
-            except OverflowError:
-                result = cp.inf
+            cp.power(z, result, out=result)  # 메모리 재할당 없이 직접 수정.
+            mask = cp.abs(result) > escape_radius
+            divergence_map[mask] = True
+            z[mask] = cp.nan # 발산한 지점은 더 이상 계산하지 않음.
+        # print(f'발산(True) 평균값 = {cp.mean(divergence_map)}')
+        divergence_map = 1-divergence_map # 흑/백 반전용
         return divergence_map
 
     def ln_exp_combi(self, z, max_iter):
@@ -201,6 +201,9 @@ class TetrationFractalExplorer:
         self.tetration_function = self.tetration_functions[self.selected_tetration_function.get()]
         self.fractal = self.tetration_function(Z, self.max_iter)
         self.phase_func = self.phase_options[self.selected_phase_value.get()]
+        
+        print(f'selected_tetration_function: {self.selected_tetration_function.get()}')
+        print(f'selected_phase:  {self.selected_phase_value.get()}')
 
         self.plot_fractal(self.max_iter, self.x_range, self.y_range, self.phase_func) # plot_fractal_alter 를 사용해 볼 수도 있으나... 별로인듯?
 
@@ -238,6 +241,8 @@ class TetrationFractalExplorer:
                                                  button=[1], minspanx=5, minspany=5, spancoords='pixels')
 
     def calculate_plot_range(self, max_iter):
+        print(f'Function : calculate_plot_range begins / New Version')
+        print(f'max_iter : {max_iter}')
         # 이미지 플롯할 해상도와 비율 얻기
         resolution_options = {
             "4K": (3840, 2160),
@@ -254,17 +259,24 @@ class TetrationFractalExplorer:
         self.aspect_ratio = self.plot_width / self.plot_height
 
         # 플롯용 x와 y의 값 설정
-        # x = np.float64(self.center_x)
-        x = self.center_x
-        y = self.center_y
+        # x = self.center_x
+        # y = self.center_y
+        x = np.float64(self.center_x)
+        y = np.float64(self.center_y)
         eps = self.eps
         eps_y = self.eps / self.aspect_ratio
         xlim = (x - eps, x + eps)
         ylim = (y - eps_y, y + eps_y)
 
+        print(f'eps: {self.eps}, eps_y: {eps_y}')
+        print(f'xlim: {xlim}, ylim: {ylim}')
+
         # 중심점&eps로 플롯할 사각형 범위(range)를 얻음. cp np 고민
         x_range = np.linspace(xlim[0], xlim[1], self.plot_width)
         y_range = np.linspace(ylim[0], ylim[1], self.plot_height)
+
+        print(f'x_range(max: {np.max(x_range)}, min: {np.min(x_range)})')
+        print(f'y_range(max: {np.max(y_range)}, min: {np.min(y_range)})')
 
         X, Y = np.meshgrid(x_range, y_range)
         Z = X + 1j * Y
@@ -280,51 +292,45 @@ class TetrationFractalExplorer:
             Z = Z.astype(cp.complex64)
 
         Z = cp.array(Z)  # GPU 연산을 위해 CuPy 배열로 변환
+        print(f'Z.shape: {Z.shape}')
+        print(f'Z[0,0]: {Z[0,0]}')
         return Z, x_range, y_range # 함수 분리로 반환 필요. 
 
     def plot_fractal(self, max_iter, x_range, y_range, phase_func):
         if self.eps > 0:
             self.ax.clear()
             extent = [x_range.min(), x_range.max(), y_range.min(), y_range.max()]
-            fractal = cp.asnumpy(phase_func(self.fractal))
+
+            # divergent는 true/fase 이므로 magnitede/angle 에 따른 처리가 필요없음.
+            if self.tetration_function == self.divergent_tetration: 
+                fractal = cp.asnumpy(self.fractal)
+            else:
+                fractal = cp.asnumpy(phase_func(self.fractal))
+
             cmap = self.selected_cmap_value.get()  # 선택된 컬러맵
             self.ax.imshow(fractal, extent=extent, cmap=cmap, origin='lower')
             self.ax.set_xlabel("Re")
             self.ax.set_ylabel("Im")
             self.ax.set_title(f'Tetration Fractal: Iterations={max_iter}\n'
-                            f'x={self.center_x:.14f}, y={self.center_y:.14f}, eps={self.eps:.14f}')
-            self.ax.set_autoscale_on(False)
+                            f'x={self.center_x}, y={self.center_y}, eps={self.eps}')
+            # self.ax.set_autoscale_on(False)
 
             self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
             self.fig.colorbar(self.ax.get_images()[0], ax=self.ax)
             self.canvas.draw()
-        
+            print('- '*30)
             self.update_status("Fractal generated. Ready...")
         else:
             self.update_status("Warning: eps must be positive")
 
-    def plot_fractal_alter(self, max_iter, x_range, y_range):
-        magnitude = np.abs(self.fractal)
-        color_magnitude = np.log(magnitude + 1e-9)
-
-        self.ax.clear()
-        extent = [x_range.min(), x_range.max(), y_range.min(), y_range.max()]       
-        img = self.ax.imshow(color_magnitude, cmap='hsv', extent=extent)
-
-        self.fig.colorbar(img, ax=self.ax, fraction=0.046, pad=0.04)
-        self.ax.set_title(f"Tetration Fractal\nMax Iterations: {max_iter}, Center: ({self.center_x:.5f}, {self.center_y:.5f}), Eps: {self.eps:.5f}")
-
-        self.canvas.draw()
-
-        self.update_status("Fractal generated.")
 
     def update_colormap(self, *args):
         """
         colormap 변경시 호출됨
         """
         self.regenerate_canvas() # 원래는 이것도 필요없어야 맞는건데, 칼라바 무한증식 현상이 나타나서 어쩔 수 없음.
-
         self.plot_fractal(self.max_iter, self.x_range, self.y_range, self.phase_func) 
+        print(f'update_colormap: {self.selected_cmap_value.get()}')
 
 
     def update_fractal(self, *args):
@@ -359,6 +365,7 @@ class TetrationFractalExplorer:
             self.update_status(f'Applied x={self.center_x:.14f}, y={self.center_y:.14f}, eps={self.eps:.14f}')
         except ValueError:
             self.update_status("Invalid input. Please enter valid numbers.")
+        print(f'apply_coordinates: {self.center_x}, {self.center_y}, {self.eps}')
 
     def zoom(self, *args):
         """Zooms in or out based on the selected zoom factor."""
@@ -369,6 +376,7 @@ class TetrationFractalExplorer:
         self.eps_entry.insert(0, f"{self.eps:.14f}")
         self.generate_fractal()
         self.update_status(f'Zoomed {"in" if zoom_factor > 1 else "out"} by {zoom_factor}')
+        print(f"Zoom: {zoom_factor}")
 
     def reset(self):
         """Resets the fractal to the initial state."""
@@ -377,6 +385,7 @@ class TetrationFractalExplorer:
         self.max_iter_var.set("100")
         self.generate_fractal()
         self.update_status("Reset to initial state")
+        print(f'resetted')
 
     def save_image(self):
         """Saves the fractal image at the selected resolution.
@@ -415,7 +424,13 @@ class TetrationFractalExplorer:
             extent = [x_range.min(), x_range.max(), y_range.min(), y_range.max()]
 
             phase_func = self.phase_options[self.selected_phase_value.get()]
-            fractal = cp.asnumpy(phase_func(self.fractal))
+
+            # divergent는 true/fase 이므로 magnitede/angle 에 따른 처리가 필요없음.
+            if self.tetration_function == self.divergent_tetration: 
+                fractal = cp.asnumpy(self.fractal)
+            else:
+                fractal = cp.asnumpy(phase_func(self.fractal))
+
             cmap = self.selected_cmap_value.get()  # 선택된 컬러맵
             ax.imshow(fractal, extent=extent, cmap=cmap, origin='lower')
 
@@ -434,6 +449,7 @@ class TetrationFractalExplorer:
         """Updates the plot aspect ratio."""
         self.generate_fractal()
         self.update_status(f'Plot ratio updated to {self.ratio_var.get()}')
+        print(f'width: {self.plot_width}, height: {self.plot_height}')
 
     def on_select(self, eclick, erelease):
         """Handles the selection of a rectangle area."""
@@ -450,6 +466,7 @@ class TetrationFractalExplorer:
         self.eps_entry.delete(0, tk.END)
         self.eps_entry.insert(0, f"{self.eps:.14f}")
         self.generate_fractal()
+        print(f'center: {self.center_x}, {self.center_y}, eps={self.eps} selected')
 
     def update_status(self, message):
         """Updates the status bar message."""
