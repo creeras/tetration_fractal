@@ -5,6 +5,9 @@
 (제가 처음 본) 오리지널 프로젝트는 이 곳입니다. 
 https://github.com/DMTPARK/mytetration
 
+이곳도 참고해 볼만 하겠습니다만, 좀 더 전문적인 지식을 필요로 하는 듯 합니다.
+https://tetration.org/original/Tetration/index.html
+
 원래는 테트레이션 -> 발산여부만 파악 -> 플롯 이미지화 하는 것입니다. 
 ```
                for k in range(max_iter):
