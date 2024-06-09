@@ -67,7 +67,7 @@ class TetrationFractalExplorer:
         self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
         self.update_status("Ready")
 
-        # 초기 프랙탈 경계 설정
+        # 초기 프랙탈 좌표 경계 설정
         self.center_x, self.center_y = 4, 0
         self.eps = 9
 
@@ -105,9 +105,15 @@ class TetrationFractalExplorer:
         ttk.Label(self.settings_frame, text="Max Iterations:").pack(side=tk.LEFT, padx=10)
 
         # 최대 반복 횟수 옵션 설정
-        self.max_iter_options = [20, 50, 100, 200, 500]
-        self.max_iter_var = tk.StringVar(value=str(self.max_iter_options[2]))
-        self.max_iter_dropdown = ttk.OptionMenu(self.settings_frame, self.max_iter_var, str(self.max_iter_options[2]), *map(str, self.max_iter_options), command=self.update_fractal)
+        self.max_iter_options = [0, 1, 2, 3, 4, 5, 10, 15, 20, 50, 100, 200, 500]
+        self.max_iter_var = tk.StringVar(value=str(self.max_iter_options[3]))
+
+        # 콤보박스 위젯 설정
+        self.max_iter_dropdown = ttk.Combobox(self.settings_frame, textvariable=self.max_iter_var, value=self.max_iter_options)
+        self.max_iter_dropdown.current(3)
+        self.max_iter_dropdown.bind("<<ComboboxSelected>>", self.update_fractal)
+
+        # 콤보박스 패킹
         self.max_iter_dropdown.pack(side=tk.LEFT, padx=10)
 
         # 플롯 화면 비율 옵션 설정
@@ -207,8 +213,9 @@ class TetrationFractalExplorer:
 
         self.plot_fractal(self.max_iter, self.x_range, self.y_range, self.phase_func) # plot_fractal_alter 를 사용해 볼 수도 있으나... 별로인듯?
 
+    # phase_func() 함수 정의
     def fractal_magnitude(self, fractal):
-        return cp.log(cp.abs(fractal))
+        return cp.log1p(cp.abs(fractal)) # fractal 함수 결과가 양측으로 극단적으로 나뉘는 상황임 cp.log 또는 cp.log1p 를 추가함.
     def fractal_angle(self, fractal):
         return cp.angle(fractal)
     
@@ -284,7 +291,7 @@ class TetrationFractalExplorer:
         # 좌표 간격이 큰 경우 데이터 타입을 축소해도 양 옆 픽셀간 구분이 가능함.
         # 좌표 간격이 작으면 작을 수록 더 정밀한 값으로 계산해야 옆 픽셀간 구분이 가능해짐.
         #  1080p 기준, 7e-4 부터 슬슬 조짐이 보이며 1e-4일 때는 일 때 많이 거슬리네요. 
-        threshold_complexity = 7e-3
+        threshold_complexity = 7e+3 # 7e-3
 
         if eps < threshold_complexity * (self.plot_width/1920):
             Z = Z.astype(cp.complex128)
@@ -348,11 +355,16 @@ class TetrationFractalExplorer:
         self.phase_menu = self.phase_options[phase_name]
 
         try:
-            if args:
-                self.max_iter_var.set(args[0])  # max_iter에서 호출할 때만
+            self.max_iter = int(self.max_iter_var.get())
+
+            #if args:
+            #    self.max_iter_var.set(args[0])  # max_iter에서 호출할 때만
             self.generate_fractal()
             self.update_status(f'Updated max iterations to {self.max_iter_var.get()}')
         except ValueError:
+            self.max_iter_var.set(str(self.max_iter_options[3]))
+            self.max_iter = self.max_iter_options[3]
+
             self.update_status("Invalid input for max iterations. Please enter a valid number.")
 
     def apply_coordinates(self):
